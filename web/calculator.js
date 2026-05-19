@@ -4,18 +4,73 @@
   s.textContent = `
     .radar3dPlot{
       width:100%;
-      height:420px;
-      min-height:420px;
+      height:360px;
+      min-height:360px;
       border:1px solid rgba(124,255,206,.24);
       border-radius:16px;
       background:#020503;
       overflow:hidden;
     }
     #calcCanvas[hidden], #radar3dPlot[hidden]{display:none!important}
+    #radar3dPlot .modebar{display:none!important}
+
+    /* Compact calculator controls: keep tabs and small control buttons on one line when possible. */
+    .calcTab{
+      min-height:26px!important;
+      padding:5px 10px!important;
+      font-size:11px!important;
+      line-height:1.1!important;
+      border-radius:12px!important;
+      white-space:nowrap!important;
+    }
+    .pcControlPad{
+      grid-template-columns:repeat(8,minmax(0,1fr))!important;
+      gap:5px!important;
+      margin-top:6px!important;
+    }
+    .pcControlPad .btn{
+      min-height:22px!important;
+      padding:2px 5px!important;
+      font-size:10px!important;
+      line-height:1.05!important;
+      border-radius:9px!important;
+    }
+    #btnCalc,#btnClearCalc,#btnLoadData,#btnClearData{
+      min-height:24px!important;
+      padding:4px 8px!important;
+      font-size:10px!important;
+      border-radius:9px!important;
+    }
+    .calculatorDataMoved button,.calculatorDataMoved .btn{
+      min-height:24px!important;
+      padding:4px 8px!important;
+      font-size:10px!important;
+    }
+    .field{
+      min-height:25px!important;
+      padding-top:4px!important;
+      padding-bottom:4px!important;
+      font-size:11px!important;
+    }
+    .label{font-size:10px!important;line-height:1.05!important}
+    .top8{margin-top:5px!important}
+
+    @media(max-height:900px){
+      .radar3dPlot{height:330px!important;min-height:330px!important}
+      #formulaBox,.formulaBox{max-height:120px!important;overflow:auto!important}
+      .inputGrid{gap:6px!important}
+      .field{padding-top:6px!important;padding-bottom:6px!important}
+      .pcControlPad{grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:5px!important}
+      .pcControlPad .btn{min-height:22px!important;padding:2px 5px!important;font-size:10px!important}
+      #calcResult{max-height:70px!important;overflow:auto!important}
+    }
   `;
   document.head.appendChild(s);
 })();
-console.log('MR MATZOS calculator.js loaded: practical toolbox restore v11');
+console.log('MR MATZOS calculator.js loaded: lidar compact controls update');
+let __lastImportedSphericalPoints = null;
+let __lastImportedSphericalTitle = 'Imported FMCW radar/LiDAR data';
+let __lastImportedSourceKind = null;
 (function rfToolboxInjectedStyle(){
   const s = document.createElement('style');
   s.textContent = `.rfToolboxGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rfToolboxNote{margin-top:8px;color:#bdf8d4;font-size:12px;line-height:1.45}@media(max-width:900px){.rfToolboxGrid{grid-template-columns:1fr}}`;
@@ -34,7 +89,7 @@ console.log('MR MATZOS calculator.js loaded: practical toolbox restore v11');
 })();
 (function pcControlPadInjectedStyle(){
   const s = document.createElement('style');
-  s.textContent = `.pcControlPad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.pcControlPad .btn{min-height:32px;padding:6px 8px}`;
+  s.textContent = `.pcControlPad{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}.pcControlPad .btn{min-height:22px;padding:2px 5px;font-size:10px;line-height:1.05}`;
   document.head.appendChild(s);
 })();
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
@@ -60,7 +115,7 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
     .calculatorDataMoved{margin-top:10px!important;margin-bottom:10px!important}
     .calculatorDataMoved input[type="file"]{width:100%;max-width:100%}
     .calculatorDataMoved .row{gap:8px;flex-wrap:wrap}
-    .calculatorDataMoved button,.calculatorDataMoved .btn{min-height:30px;padding:6px 10px}
+    .calculatorDataMoved button,.calculatorDataMoved .btn{min-height:24px;padding:4px 8px;font-size:10px}
     .compactCalcLayout textarea,.compactCalcLayout pre{max-height:170px;overflow:auto}
     @media(max-height:850px){#calcCanvas{height:285px}.formulaBox,#formulaBox{max-height:145px;overflow:auto}}
   `;
@@ -394,8 +449,8 @@ const FUNCTIONS = {
     },
     {
       id:'scan_to_3d_cloud',
-      name:'Spherical radar/LiDAR scan → 3D point cloud',
-      formula:'For every measured beam:\nx = r · cos(el) · cos(az)\ny = r · cos(el) · sin(az)\nz = r · sin(el)\n\nThis simulates radar/LiDAR points from range + azimuth + elevation.',
+      name:'Spherical radar/LiDAR scan → 3D intensity surface',
+      formula:'Radar/LiDAR input is spherical coordinates:\n\nr = range [m]\naz = azimuth [deg or rad]\nel = elevation [deg or rad]\n\nConversion to Cartesian XYZ:\nx = r · cos(el) · cos(az)\ny = r · cos(el) · sin(az)\nz = r · sin(el)\n\nVisualization:\nThe converted X/Y coordinates become the ground grid. Height/color are rendered as an intensity surface, similar to the 3D radar/RF surface visualizer.',
       custom:'scan3d',
       calc:calcScan3D
     }
@@ -630,6 +685,33 @@ function renderInputs(){
         <div><label class="label">ROTATE Y</label><input id="pcRotY" class="field" type="number" step="1" value="38"></div>
         <div><label class="label">ROTATE Z</label><input id="pcRotZ" class="field" type="number" step="1" value="0"></div>
         <div><label class="label">ZOOM</label><input id="pcZoom" class="field" type="number" step="0.1" value="1.0"></div>
+        <div>
+          <label class="label">CSV/PCD VIEW</label>
+          <select id="scanImportedView" class="field">
+            <option value="both" selected>Points + interpolated surface</option>
+            <option value="points">Measured points only</option>
+            <option value="surface">Interpolated surface only</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">SURFACE / MAP RES</label>
+          <input id="scanSurfaceRes" class="field" type="number" step="1" min="16" max="120" value="64">
+        </div>
+        <div>
+          <label class="label">COLOR MODE</label>
+          <select id="scanColorMode" class="field">
+            <option value="nearest" selected>Nearest / risk (red = closest)</option>
+            <option value="distance">Distance / range</option>
+            <option value="height">Height Z</option>
+            <option value="intensity">Intensity / reflectivity</option>
+            <option value="density">Point density</option>
+            <option value="auto">Auto: intensity / distance</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">POINT SIZE</label>
+          <input id="scanPointSize" class="field" type="number" step="0.1" min="0.4" max="10" value="2.4">
+        </div>
       </div>
       <div class="pcControlPad top8">
         <button class="btn ghost" type="button" id="pcXMinus">X-</button>
@@ -641,9 +723,36 @@ function renderInputs(){
         <button class="btn ghost" type="button" id="pcZoomMinus">ZOOM-</button>
         <button class="btn ghost" type="button" id="pcZoomPlus">ZOOM+</button>
       </div>
-      <div class="helper top8">Spherical scan is auto-fitted to the canvas.</div>
+      <div class="helper top8">CSV/PCD/log import belongs to this Radar/LiDAR view. If you load a file from another calculator mode, the UI switches here automatically.</div>
     `;
     bindPointCloudButtons();
+    const importedView = document.getElementById('scanImportedView');
+    const surfaceRes = document.getElementById('scanSurfaceRes');
+    if(importedView){
+      importedView.onchange = () => {
+        if(__lastImportedSphericalPoints && __lastImportedSphericalPoints.length){
+          drawImportedSphericalSurface(__lastImportedSphericalPoints, __lastImportedSphericalTitle);
+          const mode = importedView.value || 'both';
+          const modeText = mode === 'points' ? 'measured points only' : (mode === 'surface' ? 'interpolated surface only' : 'measured points + interpolated surface');
+          q('#dataSummary').textContent = `Loaded ${__lastImportedSphericalPoints.length} imported 3D points (${modeText}).`;
+        }
+      };
+    }
+    if(surfaceRes){
+      surfaceRes.onchange = () => {
+        if(__lastImportedSphericalPoints && __lastImportedSphericalPoints.length){
+          drawImportedSphericalSurface(__lastImportedSphericalPoints, __lastImportedSphericalTitle);
+        }
+      };
+    }
+    ['scanColorMode','scanPointSize'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.onchange = () => {
+        if(__lastImportedSphericalPoints && __lastImportedSphericalPoints.length){
+          drawImportedSphericalSurface(__lastImportedSphericalPoints, __lastImportedSphericalTitle);
+        }
+      };
+    });
     drawEmpty();
     return;
   }
@@ -884,7 +993,8 @@ function drawRadarSurface3D(config='interference') {
     margin:{l:0,r:0,t:0,b:0}
   },{
     responsive:true,
-    displaylogo:false
+    displaylogo:false,
+    displayModeBar:false
   });
 
   const hint = document.getElementById('visualHint');
@@ -1408,6 +1518,17 @@ function drawRadarCoreResolution(ctx,w,h,v){
 function calculate(){
   const fn=activeFn();
   try{
+    // If a CSV/PCD point cloud is loaded, CALCULATE should not replace it with
+    // a generated demo surface. It re-renders the imported data using the current
+    // view controls instead.
+    if(fn && fn.custom === 'scan3d' && __lastImportedSphericalPoints && __lastImportedSphericalPoints.length){
+      drawImportedSphericalSurface(__lastImportedSphericalPoints, __lastImportedSphericalTitle);
+      const mode = (document.getElementById('scanImportedView')?.value || 'both');
+      q('#calcResult').textContent =
+        `Using imported ${__lastImportedSourceKind || 'radar/LiDAR'} file: ${__lastImportedSphericalPoints.length} points. View = ${mode}.`;
+      return;
+    }
+
     const result = fn.custom ? fn.calc({}) : fn.calc(readValues(fn));
     q('#calcResult').textContent = result.text;
     if(result.type !== 'pointcloud3d' && result.type !== 'dopplerBatchResult') drawResult(result);
@@ -1422,16 +1543,133 @@ function parseRows(text){
   ).filter(r=>r.length);
 }
 
-function drawImported(rows){
+function parseAsciiPCD(text){
+  const lines = String(text).split(/\r?\n/);
+  const fieldsLine = lines.find(l => /^\s*FIELDS\s+/i.test(l));
+  const dataIndex = lines.findIndex(l => /^\s*DATA\s+ascii\s*$/i.test(l));
+  if(dataIndex < 0) return null;
+
+  const fields = fieldsLine
+    ? fieldsLine.trim().split(/\s+/).slice(1).map(s => s.toLowerCase())
+    : ['x','y','z'];
+
+  const ix = fields.indexOf('x');
+  const iy = fields.indexOf('y');
+  const iz = fields.indexOf('z');
+  const ii = fields.findIndex(f => ['intensity','i','rgb','rgba','strength','power'].includes(f));
+  if(ix < 0 || iy < 0 || iz < 0) return null;
+
+  const points = [];
+  for(const line of lines.slice(dataIndex + 1)){
+    const s = line.trim();
+    if(!s || s.startsWith('#')) continue;
+    const cols = s.split(/\s+/).map(Number);
+    if(cols.length <= Math.max(ix, iy, iz) || !cols.every(v => Number.isFinite(v))) continue;
+
+    const x = cols[ix], y = cols[iy], z = cols[iz];
+    const r = Math.sqrt(x*x + y*y + z*z);
+    const hasIntensity = ii >= 0 && Number.isFinite(cols[ii]);
+    const intensity = hasIntensity ? cols[ii] : r;
+    points.push({x, y, z, intensity, r, hasIntensity, source:'pcd'});
+  }
+
+  return points.length ? {points, fields} : null;
+}
+
+function splitCsvLine(line){
+  // Small CSV splitter, enough for normal sensor logs without quoted commas.
+  return String(line).split(/[,;\t]/).map(s => s.trim());
+}
+
+function parseNamedSphericalCsv(text){
+  const lines = String(text).trim().split(/\r?\n/).filter(Boolean);
+  if(lines.length < 2) return null;
+  const headers = splitCsvLine(lines[0]).map(h => h.toLowerCase());
+  const idx = nameList => headers.findIndex(h => nameList.includes(h));
+  const iRange = idx(['range','r','distance','distance_m','range_m']);
+  const iAz = idx(['azimuth','az','azi']);
+  const iEl = idx(['elevation','el','elev']);
+  const iIntensity = idx(['intensity','signal','strength','power','amplitude']);
+  const iLabel = idx(['label','class','target']);
+  if(iRange < 0 || iAz < 0 || iEl < 0) return null;
+
+  const points = [];
+  for(const line of lines.slice(1)){
+    const cols = splitCsvLine(line);
+    const r = Number(cols[iRange]);
+    let az = Number(cols[iAz]);
+    let el = Number(cols[iEl]);
+    if(![r,az,el].every(Number.isFinite)) continue;
+
+    // Auto-detect radians vs degrees. Your FMCW CSV uses radians (e.g. az=2.4).
+    // UI fields use degrees, so both are accepted.
+    const looksRadians = Math.abs(az) <= Math.PI*2.05 && Math.abs(el) <= Math.PI*2.05;
+    const azRad = looksRadians ? az : az*Math.PI/180;
+    const elRad = looksRadians ? el : el*Math.PI/180;
+    const intensityRaw = iIntensity >= 0 ? Number(cols[iIntensity]) : NaN;
+    const intensity = Number.isFinite(intensityRaw) ? intensityRaw : r;
+    points.push({
+      x: r*Math.cos(elRad)*Math.cos(azRad),
+      y: r*Math.cos(elRad)*Math.sin(azRad),
+      z: r*Math.sin(elRad),
+      r,
+      az,
+      el,
+      azRad,
+      elRad,
+      intensity,
+      label: iLabel >= 0 ? cols[iLabel] : ''
+    });
+  }
+  return points.length ? {points, unit:'auto'} : null;
+}
+
+
+function activateScan3DForImportedData(){
+  // Imported FMCW/radar/LiDAR logs are not a generic calculator input.
+  // Force the UI into the matching visualization mode so imported data
+  // does not appear on top of Ohm/coordinate/other calculation views.
+  const scanTabBtn = document.querySelector('.calcTab[data-tab="pointcloud"]');
+  if(scanTabBtn){
+    qa('.calcTab').forEach(b=>b.classList.remove('active'));
+    scanTabBtn.classList.add('active');
+  }
+  currentTab = 'pointcloud';
+  const sel = q('#calcFunction');
+  if(sel){
+    sel.innerHTML = FUNCTIONS.pointcloud.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+    sel.value = 'scan_to_3d_cloud';
+  }
+  renderInputs();
+}
+
+function drawImported(rows, meta=null){
+  if(meta && meta.sphericalPoints && meta.sphericalPoints.length){
+    __lastImportedSphericalPoints = meta.sphericalPoints;
+    __lastImportedSphericalTitle = 'Imported FMCW radar/LiDAR data';
+    __lastImportedSourceKind = 'CSV spherical radar/LiDAR';
+    drawImportedSphericalSurface(meta.sphericalPoints, __lastImportedSphericalTitle);
+    const mode = (document.getElementById('scanImportedView')?.value || 'both');
+    const modeText = mode === 'points' ? 'measured points only' : (mode === 'surface' ? 'interpolated surface only' : 'measured points + interpolated surface');
+    q('#dataSummary').textContent = `Loaded ${meta.sphericalPoints.length} spherical radar/LiDAR points and converted to Cartesian XYZ (${modeText}).`;
+    return;
+  }
+
+  __lastImportedSphericalPoints = null;
+  __lastImportedSourceKind = null;
   if(!rows.length) return;
 
   const maxCols = Math.max(...rows.map(r=>r.length));
   if(maxCols >= 3){
     const pts3 = rows
       .filter(r => r.length >= 3)
-      .map(r => ({x:r[0], y:r[1], z:r[2], r:Math.sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2])}));
-    drawPointCloud3D(pts3, {rx:25, ry:35, title:'Imported 3D point cloud'});
-    q('#dataSummary').textContent = `Loaded ${pts3.length} 3D points from file.`;
+      .map(r => ({x:r[0], y:r[1], z:r[2], intensity:Number.isFinite(r[3]) ? r[3] : r[2], r:Math.sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2])}));
+    __lastImportedSphericalPoints = pts3;
+    __lastImportedSphericalTitle = 'Imported Cartesian 3D data';
+    __lastImportedSourceKind = 'XYZ/Cartesian';
+    drawImportedSphericalSurface(pts3, __lastImportedSphericalTitle);
+    const mode = (document.getElementById('scanImportedView')?.value || 'both');
+    q('#dataSummary').textContent = `Loaded ${pts3.length} Cartesian XYZ points from file (${mode}).`;
     return;
   }
 
@@ -1456,6 +1694,44 @@ async function loadData(){
   const file=q('#dataFile').files[0];
   if(!file){q('#dataSummary').textContent='Choose a file first.';return;}
   const text=await file.text();
+  const lowerName = String(file.name || '').toLowerCase();
+
+  if(lowerName.endsWith('.pcd')){
+    const pcd = parseAsciiPCD(text);
+    if(!pcd){
+      q('#dataSummary').textContent = 'PCD file could not be parsed. Only ASCII PCD with FIELDS x y z is supported.';
+      return;
+    }
+    activateScan3DForImportedData();
+    const viewSel = document.getElementById('scanImportedView');
+    if(viewSel){
+      viewSel.disabled = false;
+      viewSel.innerHTML = `
+        <option value="points">PCD point cloud only</option>
+        <option value="floor" selected>Point cloud + visible floor projection</option>
+      `;
+      viewSel.value = 'floor';
+    }
+    const colorSel = document.getElementById('scanColorMode');
+    if(colorSel) colorSel.value = 'nearest';
+    __lastImportedSphericalPoints = pcd.points;
+    __lastImportedSphericalTitle = 'Imported PCD Cartesian point cloud';
+    __lastImportedSourceKind = 'PCD';
+    drawImportedSphericalSurface(pcd.points, __lastImportedSphericalTitle);
+    q('#dataSummary').textContent = `Loaded ${pcd.points.length} PCD XYZ points from file.`;
+    q('#calcResult').textContent = 'PCD loaded. X/Y/Z are physical geometry. Default color: nearest/risk, where red = closest. Intensity remains separate material/return strength.';
+    return;
+  }
+
+  const named = parseNamedSphericalCsv(text);
+  if(named){
+    activateScan3DForImportedData();
+    const viewSel = document.getElementById('scanImportedView');
+    if(viewSel) viewSel.value = 'both';
+    drawImported([], {sphericalPoints:named.points});
+    return;
+  }
+
   let rows=[];
   try{
     if(file.name.toLowerCase().endsWith('.json')){
@@ -1463,8 +1739,412 @@ async function loadData(){
       rows=Array.isArray(j) ? j.map(o=>Array.isArray(o)?o:[o.x,o.y,o.z,o.mv,o.adc].map(Number).filter(Number.isFinite)) : [];
     } else rows=parseRows(text);
   }catch(e){ rows=parseRows(text); }
+  activateScan3DForImportedData();
   drawImported(rows);
 }
+
+function normalize01(value, min, max){
+  if(!Number.isFinite(value)) return 0.5;
+  return (value - min) / ((max - min) || 1);
+}
+
+function makeSurfaceColorscale(){
+  return [
+    [0,'#003060'],
+    [0.20,'#0066cc'],
+    [0.42,'#00d6ff'],
+    [0.58,'#32ff8a'],
+    [0.76,'#ffff33'],
+    [1,'#e51b23']
+  ];
+}
+
+function drawSphericalScanSurface3D(grid, points=[], opts={}){
+  if(!window.Plotly){
+    drawPointCloud3D(points, {rx:32, ry:-45, rz:0, zoom:1, title:opts.title || 'Spherical → Cartesian point cloud'});
+    return;
+  }
+
+  useRadar3DVisualization();
+  const div = document.getElementById('radar3dPlot');
+  if(!div) return;
+
+  const trace = {
+    x:grid.x,
+    y:grid.y,
+    z:grid.z,
+    surfacecolor:grid.intensity || grid.z,
+    type:'surface',
+    colorscale:makeSurfaceColorscale(),
+    showscale:true,
+    colorbar:{title:'Intensity', tickfont:{color:'#7fffc3'}, titlefont:{color:'#7fffc3'}},
+    contours:{
+      z:{show:true, usecolormap:true, highlightcolor:'#7fffc3', project:{z:true}}
+    },
+    lighting:{ambient:0.42, diffuse:0.78, specular:0.35, roughness:0.55, fresnel:0.2},
+    lightposition:{x:100,y:180,z:120}
+  };
+
+  try { Plotly.purge(div); } catch(e) {}
+  Plotly.newPlot(div,[trace],{
+    paper_bgcolor:'#020503',
+    plot_bgcolor:'#020503',
+    scene:{
+      bgcolor:'#020503',
+      xaxis:{title:'X lateral [m]', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.18)', zerolinecolor:'rgba(255,243,214,0.28)'},
+      yaxis:{title:'Y forward [m]', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.18)', zerolinecolor:'rgba(255,243,214,0.28)'},
+      zaxis:{title:'Z intensity', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.18)', zerolinecolor:'rgba(255,243,214,0.28)', range:[-1.15,1.15]},
+      camera:{eye:{x:1.45,y:1.35,z:0.85}}
+    },
+    margin:{l:0,r:0,t:0,b:0},
+    annotations:[{
+      text:opts.title || 'Spherical → Cartesian radar/LiDAR intensity surface',
+      x:0.02,y:0.98,xref:'paper',yref:'paper',showarrow:false,
+      font:{color:'#d6ffe7',size:13},align:'left'
+    }]
+  },{
+    responsive:true,
+    displaylogo:false,
+    displayModeBar:false
+  });
+
+  const hint = document.getElementById('visualHint');
+  if(hint) hint.textContent = 'Spherical radar/LiDAR data converted to Cartesian X/Y, then rendered as a 3D intensity surface. Drag to rotate, scroll to zoom.';
+}
+
+function buildInterpolatedSurfaceGrid(points, resolution=48){
+  const clean = (points || []).filter(p => [p.x,p.y].every(Number.isFinite));
+  if(!clean.length) return null;
+
+  const xs = clean.map(p=>p.x), ys = clean.map(p=>p.y);
+  let minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = Math.max(1e-6, maxX-minX);
+  const spanY = Math.max(1e-6, maxY-minY);
+  const padX = spanX * 0.10;
+  const padY = spanY * 0.10;
+  minX -= padX; maxX += padX; minY -= padY; maxY += padY;
+
+  const intensities = clean.map(p => Number.isFinite(p.intensity) ? p.intensity : (Number.isFinite(p.r) ? p.r : p.z || 0));
+  const minI = Math.min(...intensities), maxI = Math.max(...intensities);
+  const normI = (v) => normalize01(v, minI, maxI) * 2 - 1;
+  const res = Math.max(16, Math.min(90, Number(resolution) || 48));
+  const xGrid=[], yGrid=[], zGrid=[], cGrid=[];
+  const influence = Math.max(spanX, spanY) / Math.max(1.5, Math.sqrt(clean.length));
+
+  for(let yi=0; yi<res; yi++){
+    const rowX=[], rowY=[], rowZ=[], rowC=[];
+    const y = minY + (maxY-minY) * yi / Math.max(1,res-1);
+    for(let xi=0; xi<res; xi++){
+      const x = minX + (maxX-minX) * xi / Math.max(1,res-1);
+      let weighted = 0, wsum = 0;
+      for(let i=0;i<clean.length;i++){
+        const p = clean[i];
+        const dx=x-p.x, dy=y-p.y;
+        const d2=dx*dx + dy*dy;
+        const w = 1 / Math.pow(d2 + influence*influence*0.05, 1.35);
+        weighted += w * normI(intensities[i]);
+        wsum += w;
+      }
+      let val = wsum ? weighted/wsum : 0;
+      // Sparse CSV files otherwise look almost identical to point-only mode.
+      // Add a soft estimated relief around measured points so 'surface' and 'both' are visibly different,
+      // while the UI clearly labels it as interpolation rather than extra measured samples.
+      if(clean.length <= 12){
+        let peak = 0;
+        for(let i=0;i<clean.length;i++){
+          const p = clean[i];
+          const dx=x-p.x, dy=y-p.y;
+          const d2=dx*dx + dy*dy;
+          peak += Math.exp(-d2 / Math.max(1e-6, influence*influence*0.22)) * (0.35 + 0.65*Math.abs(normI(intensities[i])));
+        }
+        peak = Math.min(1, peak);
+        val = Math.max(-1, Math.min(1, val*0.55 + (peak*2-1)*0.45));
+      }
+      rowX.push(x); rowY.push(y); rowZ.push(val); rowC.push(val);
+    }
+    xGrid.push(rowX); yGrid.push(rowY); zGrid.push(rowZ); cGrid.push(rowC);
+  }
+  return {x:xGrid, y:yGrid, z:zGrid, intensity:cGrid};
+}
+
+function buildFlatFloorDensityGrid(points, resolution=64){
+  const clean = (points || []).filter(p => [p.x,p.y].every(Number.isFinite));
+  if(!clean.length) return null;
+
+  const xs = clean.map(p=>p.x), ys = clean.map(p=>p.y);
+  let minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = Math.max(1e-6, maxX-minX);
+  const spanY = Math.max(1e-6, maxY-minY);
+  minX -= spanX*0.08; maxX += spanX*0.08;
+  minY -= spanY*0.08; maxY += spanY*0.08;
+
+  const res = Math.max(24, Math.min(120, Number(resolution) || 64));
+  const xGrid=[], yGrid=[], zGrid=[], cGrid=[];
+  const radius = Math.max(spanX, spanY) / Math.max(8, Math.sqrt(clean.length) * 0.75);
+  const r2 = Math.max(1e-6, radius*radius);
+
+  let maxDensity = 0;
+  const densities = [];
+  for(let yi=0; yi<res; yi++){
+    const dRow=[];
+    const y = minY + (maxY-minY) * yi / Math.max(1,res-1);
+    for(let xi=0; xi<res; xi++){
+      const x = minX + (maxX-minX) * xi / Math.max(1,res-1);
+      let d = 0;
+      for(const p of clean){
+        const dx=x-p.x, dy=y-p.y;
+        d += Math.exp(-(dx*dx + dy*dy) / (2*r2));
+      }
+      dRow.push(d);
+      if(d > maxDensity) maxDensity = d;
+    }
+    densities.push(dRow);
+  }
+
+  for(let yi=0; yi<res; yi++){
+    const rowX=[], rowY=[], rowZ=[], rowC=[];
+    const y = minY + (maxY-minY) * yi / Math.max(1,res-1);
+    for(let xi=0; xi<res; xi++){
+      const x = minX + (maxX-minX) * xi / Math.max(1,res-1);
+      rowX.push(x);
+      rowY.push(y);
+      rowZ.push(0);       // IMPORTANT: floor projection is always flat at Z=0.
+      rowC.push(maxDensity ? densities[yi][xi] / maxDensity : 0);
+    }
+    xGrid.push(rowX); yGrid.push(rowY); zGrid.push(rowZ); cGrid.push(rowC);
+  }
+  return {x:xGrid, y:yGrid, z:zGrid, density:cGrid, bounds:{minX,maxX,minY,maxY}};
+}
+
+function makeFloorGridLines(bounds, steps=10){
+  if(!bounds) return null;
+  const {minX,maxX,minY,maxY} = bounds;
+  const x=[], y=[], z=[];
+  const zGrid = 0.025; // tiny visual lift to avoid WebGL z-fighting; floor reference remains Z=0.
+  for(let i=0;i<=steps;i++){
+    const xx = minX + (maxX-minX)*i/steps;
+    x.push(xx,xx,null); y.push(minY,maxY,null); z.push(zGrid,zGrid,null);
+    const yy = minY + (maxY-minY)*i/steps;
+    x.push(minX,maxX,null); y.push(yy,yy,null); z.push(zGrid,zGrid,null);
+  }
+  return {x,y,z};
+}
+
+
+function getPointDensityValues(points){
+  const clean = (points || []).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if(!clean.length) return (points || []).map(()=>0);
+
+  const xs = clean.map(p=>p.x), ys = clean.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const bins = 44;
+  const counts = new Map();
+
+  const keyFor = p => {
+    const ix = Math.max(0, Math.min(bins-1, Math.floor((p.x-minX)/((maxX-minX)||1)*bins)));
+    const iy = Math.max(0, Math.min(bins-1, Math.floor((p.y-minY)/((maxY-minY)||1)*bins)));
+    return ix + ':' + iy;
+  };
+
+  for(const p of clean){
+    const key = keyFor(p);
+    counts.set(key, (counts.get(key)||0) + 1);
+  }
+
+  let maxCount = 1;
+  for(const v of counts.values()) maxCount = Math.max(maxCount, v);
+
+  return (points || []).map(p => {
+    if(!Number.isFinite(p.x) || !Number.isFinite(p.y)) return 0;
+    return (counts.get(keyFor(p)) || 0) / maxCount;
+  });
+}
+
+function getImportedColorValues(points, isPCD){
+  const requested = document.getElementById('scanColorMode')?.value || 'nearest';
+  const hasRealIntensity = points.some(p => p.hasIntensity === true);
+  let mode = requested;
+
+  if(mode === 'auto'){
+    mode = (isPCD && hasRealIntensity) ? 'intensity' : 'nearest';
+  }
+
+  let values;
+  let title;
+
+  if(mode === 'height'){
+    values = points.map(p => Number.isFinite(p.z) ? p.z : 0);
+    title = 'Height Z [m]';
+  } else if(mode === 'nearest'){
+    // Keep XYZ geometry untouched. Only invert the color value so red = closest/risk.
+    values = points.map(p => -(Number.isFinite(p.r) ? p.r : Math.sqrt(p.x*p.x+p.y*p.y+p.z*p.z)));
+    title = 'Nearest / risk (red = closest)';
+  } else if(mode === 'distance'){
+    values = points.map(p => Number.isFinite(p.r) ? p.r : Math.sqrt(p.x*p.x+p.y*p.y+p.z*p.z));
+    title = 'Distance [m]';
+  } else if(mode === 'density'){
+    values = getPointDensityValues(points);
+    title = 'Point density';
+  } else {
+    values = points.map(p => Number.isFinite(p.intensity) ? p.intensity : (Number.isFinite(p.r) ? p.r : 0));
+    title = hasRealIntensity ? 'Intensity / reflectivity' : 'Distance [m]';
+  }
+
+  return {values, title, mode, hasRealIntensity};
+}
+
+function drawImportedSphericalSurface(points, title='Imported FMCW radar/LiDAR data'){
+  if(!points || !points.length) return;
+
+  let viewMode = (document.getElementById('scanImportedView')?.value || 'both');
+  const surfaceRes = Math.max(16, Math.min(120, Number(document.getElementById('scanSurfaceRes')?.value || 64)));
+
+  if(!window.Plotly){
+    drawPointCloud3D(points, {rx:32, ry:-45, rz:0, zoom:1, title});
+    return;
+  }
+
+  useRadar3DVisualization();
+  const div = document.getElementById('radar3dPlot');
+  if(!div) return;
+
+  const isPCD = (__lastImportedSourceKind === 'PCD') || points.some(p => p.source === 'pcd');
+
+  // PCD is already Cartesian XYZ. Never turn it into a fake height surface.
+  // For PCD, Z stays physical height. The optional floor map is a flat projection at Z=0.
+  if(isPCD && (viewMode === 'both' || viewMode === 'surface')) viewMode = 'floor';
+
+  const colorInfo = getImportedColorValues(points, isPCD);
+  const colorValues = colorInfo.values;
+  const pointSizeInput = Number(document.getElementById('scanPointSize')?.value);
+  const pointSize = Number.isFinite(pointSizeInput) ? Math.max(0.4, Math.min(10, pointSizeInput)) : (points.length > 5000 ? 1.4 : 2.4);
+  const traces = [];
+  if(isPCD && viewMode === 'floor'){
+    const floor = buildFlatFloorDensityGrid(points, surfaceRes);
+    if(floor){
+      traces.push({
+        x:floor.x,
+        y:floor.y,
+        z:floor.z,
+        surfacecolor:floor.density,
+        type:'surface',
+        name:'visible floor density projection (flat Z=0)',
+        colorscale:[[0,'#031b16'],[0.18,'#064437'],[0.45,'#0aa98b'],[0.75,'#33ffd0'],[1,'#fff36e']],
+        cmin:0,
+        cmax:1,
+        showscale:false,
+        opacity:0.72,
+        hoverinfo:'skip',
+        contours:{z:{show:false}},
+        lighting:{ambient:1.0, diffuse:0.45, specular:0.05, roughness:0.9}
+      });
+      const floorLines = makeFloorGridLines(floor.bounds, 12);
+      if(floorLines){
+        traces.push({
+          x:floorLines.x,
+          y:floorLines.y,
+          z:floorLines.z,
+          type:'scatter3d',
+          mode:'lines',
+          name:'Z=0 floor grid',
+          line:{color:'rgba(255,243,214,0.80)', width:3},
+          hoverinfo:'skip',
+          showlegend:false
+        });
+      }
+    }
+  }
+
+  if(!isPCD && (viewMode === 'surface' || viewMode === 'both')){
+    const grid = buildInterpolatedSurfaceGrid(points, surfaceRes);
+    if(grid){
+      traces.push({
+        x:grid.x,
+        y:grid.y,
+        z:grid.z,
+        surfacecolor:grid.intensity,
+        type:'surface',
+        name:'interpolated intensity surface',
+        colorscale:makeSurfaceColorscale(),
+        showscale:viewMode === 'surface',
+        colorbar:{title:'Intensity', tickfont:{color:'#7fffc3'}, titlefont:{color:'#7fffc3'}},
+        opacity:viewMode === 'both' ? 0.62 : 0.95,
+        contours:{z:{show:true, usecolormap:true, project:{z:true}}},
+        lighting:{ambient:0.42, diffuse:0.78, specular:0.35, roughness:0.55, fresnel:0.2},
+        lightposition:{x:100,y:180,z:120}
+      });
+    }
+  }
+
+  if(isPCD || viewMode === 'points' || viewMode === 'both'){
+    traces.push({
+      x:points.map(p=>p.x),
+      y:points.map(p=>p.y),
+      z:points.map(p=>p.z),
+      mode:'markers',
+      type:'scatter3d',
+      name:isPCD ? 'PCD XYZ points' : 'measured points',
+      marker:{
+        size:pointSize,
+        color:colorValues,
+        colorscale:makeSurfaceColorscale(),
+        showscale:true,
+        colorbar:{title:colorInfo.title, tickfont:{color:'#7fffc3'}, titlefont:{color:'#7fffc3'}},
+        opacity:(isPCD && viewMode === 'floor') ? (points.length > 7000 ? 0.78 : 0.90) : (points.length > 7000 ? 0.80 : 0.92),
+        line:{color:'rgba(214,255,231,0.45)', width:points.length > 3000 ? 0 : 0.7}
+      },
+      text:points.map((p,i)=>{
+        const r = Number.isFinite(p.r) ? p.r : Math.sqrt(p.x*p.x+p.y*p.y+p.z*p.z);
+        return `${isPCD ? 'PCD XYZ POINT' : 'MEASURED POINT'}<br>`+
+          `x=${p.x.toFixed(3)} m<br>y=${p.y.toFixed(3)} m<br>z=${p.z.toFixed(3)} m<br>`+
+          `distance=${r.toFixed(3)} m<br>${colorInfo.title}=${Number(colorValues[i]).toFixed(3)}`;
+      }),
+      hoverinfo:'text'
+    });
+  }
+
+  const modeLabel = isPCD
+    ? (viewMode === 'floor' ? 'True XYZ point cloud + visible Z=0 floor grid/heatmap' : 'True XYZ point cloud only')
+    : (viewMode === 'points' ? 'Measured points only' : (viewMode === 'surface' ? 'Interpolated intensity surface' : 'Measured points + interpolated intensity surface'));
+
+  try { Plotly.purge(div); } catch(e) {}
+  Plotly.newPlot(div,traces,{
+    paper_bgcolor:'#020503',
+    plot_bgcolor:'#020503',
+    scene:{
+      bgcolor:'#020503',
+      xaxis:{title:'X lateral [m]', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.24)', zerolinecolor:'rgba(255,243,214,0.45)'},
+      yaxis:{title:'Y forward [m]', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.24)', zerolinecolor:'rgba(255,243,214,0.45)'},
+      zaxis:{title:isPCD ? 'Z height [m]' : 'Z / intensity view', color:'#7fffc3', gridcolor:'rgba(127,255,195,0.24)', zerolinecolor:'rgba(255,243,214,0.45)'},
+      aspectmode:'data',
+      camera:{eye:{x:1.65,y:1.20,z:0.72}}
+    },
+    margin:{l:0,r:0,t:0,b:0},
+    annotations:[{
+      text:title + '<br>' + modeLabel + '<br>' + (isPCD ? 'X/Y/Z = physical position. Z=height. Color mode: '+colorInfo.title+'<br>Z=0 = road/floor plane. Sensor origin = vehicle LiDAR.' : 'Spherical input converted to Cartesian XYZ.'),
+      x:0.02,y:0.98,xref:'paper',yref:'paper',showarrow:false,
+      font:{color:'#d6ffe7',size:13},align:'left'
+    }]
+  },{
+    responsive:true,
+    displaylogo:false,
+    displayModeBar:false
+  });
+
+  const hint = document.getElementById('visualHint');
+  if(hint){
+    if(isPCD){
+      hint.textContent = 'PCD view: X/Y/Z are real geometry. Z=height. Distance/nearest comes from range/ToF math, not reflectivity. Intensity is material/return strength. Floor grid is flat Z=0.';
+    } else if(viewMode === 'points') hint.textContent = 'CSV view: true measured points only. No artificial surface is added.';
+    else if(viewMode === 'surface') hint.textContent = 'CSV view: interpolated surface from measured radar points. This is a visual estimate, not extra measured samples.';
+    else hint.textContent = 'CSV view: measured points plus an interpolated surface. Points are real; the surface is estimated for visualization.';
+  }
+}
+
+
 
 
 function calcPointCloudDemo(){
@@ -1492,22 +2172,51 @@ function calcScan3D(){
   }
 
   const points = [];
+  const grid = { x:[], y:[], z:[], intensity:[] };
   for(let ei=0; ei<elSteps; ei++){
-    const el = (elStart + (elEnd-elStart) * ei / Math.max(1, elSteps-1)) * Math.PI/180;
+    const rowX = [], rowY = [], rowZ = [], rowI = [];
+    const elDeg = elStart + (elEnd-elStart) * ei / Math.max(1, elSteps-1);
+    const el = elDeg * Math.PI/180;
     for(let ai=0; ai<azSteps; ai++){
-      const az = (azStart + (azEnd-azStart) * ai / Math.max(1, azSteps-1)) * Math.PI/180;
-      const surface = 0.5 + 0.5*Math.sin(ai*0.45)*Math.cos(ei*0.6);
-      const r = rMin + (rMax-rMin) * surface;
-      points.push({
-        x: r*Math.cos(el)*Math.cos(az),
-        y: r*Math.cos(el)*Math.sin(az),
-        z: r*Math.sin(el),
-        r
-      });
+      const azDeg = azStart + (azEnd-azStart) * ai / Math.max(1, azSteps-1);
+      const az = azDeg * Math.PI/180;
+
+      // Synthetic return/intensity field. Range still comes from the spherical scan,
+      // but the 3D rendering uses intensity as surface height so the view looks like
+      // the nicer radar/RF 3D surface visualizer instead of only a flat point cloud.
+      const waveA = Math.sin(ai*0.45) * Math.cos(ei*0.60);
+      const waveB = Math.sin((ai+ei)*0.19) * 0.25;
+      const intensity = Math.max(-1, Math.min(1, waveA + waveB));
+      const surface01 = 0.5 + 0.5 * intensity;
+      const r = rMin + (rMax-rMin) * surface01;
+      const x = r*Math.cos(el)*Math.cos(az);
+      const y = r*Math.cos(el)*Math.sin(az);
+      const z = r*Math.sin(el);
+
+      points.push({x,y,z,r,intensity,azDeg,elDeg});
+      rowX.push(x);
+      rowY.push(y);
+      rowZ.push(intensity);      // surface height = signal/intensity
+      rowI.push(intensity);      // surface color = signal/intensity
     }
+    grid.x.push(rowX);
+    grid.y.push(rowY);
+    grid.z.push(rowZ);
+    grid.intensity.push(rowI);
   }
-  drawPointCloud3D(points, {rx:Number(q('#pcRotX')?.value || 22), ry:Number(q('#pcRotY')?.value || 38), rz:Number(q('#pcRotZ')?.value || 0), zoom:Number(q('#pcZoom')?.value || 1), title:'Simulated spherical scan'});
-  return { text:`Generated ${points.length} scan points from spherical coordinates.`, type:'pointcloud3d', points };
+
+  drawSphericalScanSurface3D(grid, points, {
+    title:'Spherical → Cartesian radar/LiDAR intensity surface',
+    azSteps,
+    elSteps,
+    converted:true
+  });
+
+  return {
+    text:`Generated ${points.length} scan points.\nInput: spherical coordinates (range, azimuth, elevation)\nConverted to Cartesian (X, Y, Z)\nRendered as radar-style 3D intensity surface.`,
+    type:'pointcloud3d',
+    points
+  };
 }
 
 function generatePointCloudDemo(count, shape){
@@ -2249,6 +2958,21 @@ function findSmallestAncestorContaining(el, predicate){
 function configureCompactCalculatorLayout(){
   document.body.classList.add('compactCalcLayout');
 
+  // Force all main tab buttons onto a single compact row.
+  const tabs = qa('.calcTab');
+  if(tabs.length && tabs[0].parentElement){
+    const tabBar = tabs[0].parentElement;
+    tabBar.style.display = 'grid';
+    tabBar.style.gridTemplateColumns = `repeat(${tabs.length}, minmax(0, 1fr))`;
+    tabBar.style.gap = '8px';
+    tabs.forEach(t => {
+      t.style.minHeight = '26px';
+      t.style.padding = '5px 10px';
+      t.style.fontSize = '11px';
+      t.style.whiteSpace = 'nowrap';
+    });
+  }
+
   // Keep canvas low enough that the calculator fits in the browser without scrolling as much.
   const canvas = q('#calcCanvas');
   if(canvas){
@@ -2286,7 +3010,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   q('#btnCalc').onclick=calculate;
   q('#btnClearCalc').onclick=()=>{renderInputs();q('#calcResult').textContent='Cleared.';};
   q('#btnLoadData').onclick=loadData;
-  q('#btnClearData').onclick=()=>{q('#dataFile').value='';q('#dataSummary').textContent='Cleared.';drawEmpty();};
+  q('#btnClearData').onclick=()=>{q('#dataFile').value='';q('#dataSummary').textContent='Cleared.';__lastImportedSphericalPoints=null;__lastImportedSourceKind=null;drawEmpty();};
   setOptions();
   window.addEventListener('resize', () => { configureCompactCalculatorLayout(); drawEmpty(); });
 });
