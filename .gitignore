@@ -1,0 +1,8 @@
+Thumbs.db
+__pycache__/
+*.bak
+*.old
+*.tmp
+database.db
+data/
+web/update/
