@@ -1,0 +1,26 @@
+# --- Ignore images and binary assets ---
+images/** linguist-vendored
+*.png linguist-vendored
+*.jpg linguist-vendored
+*.jpeg linguist-vendored
+*.gif linguist-vendored
+*.ico linguist-vendored
+
+# --- Ignore generated/minified frontend files ---
+*.min.js linguist-vendored
+*.min.css linguist-vendored
+
+# --- Ignore build/cache artifacts ---
+.pio/** linguist-vendored
+node_modules/** linguist-vendored
+__pycache__/** linguist-vendored
+
+# --- Treat Arduino files as C++ ---
+*.ino linguist-language=C++
+
+# --- Ignore Docker/generated config files in stats ---
+docker-compose.yml linguist-generated=true
+
+# --- Ignore temporary files ---
+*.log linguist-generated=true
+*.tmp linguist-generated=true
